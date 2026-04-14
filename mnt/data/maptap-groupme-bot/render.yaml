@@ -1,0 +1,33 @@
+services:
+  - type: web
+    name: maptap-groupme-bot
+    runtime: node
+    plan: starter
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_VERSION
+        value: 20
+      - key: NODE_ENV
+        value: production
+      - key: APP_BASE_URL
+        sync: false
+      - key: GROUPME_ACCESS_TOKEN
+        sync: false
+      - key: GROUPME_BOT_ID
+        sync: false
+      - key: GROUPME_GROUP_ID
+        sync: false
+      - key: DAILY_JOB_SECRET
+        sync: false
+      - key: TIMEZONE
+        value: America/New_York
+      - key: DAILY_POST_HOUR_LOCAL
+        value: "12"
+      - key: DATABASE_PATH
+        value: /var/data/maptap.sqlite
+    disk:
+      name: maptap-data
+      mountPath: /var/data
+      sizeGB: 1

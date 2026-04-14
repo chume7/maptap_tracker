@@ -1,0 +1,21 @@
+{
+  "name": "maptap-groupme-bot",
+  "version": "1.0.0",
+  "description": "GroupMe bot that tracks MapTap scores and posts daily all-time averages",
+  "main": "src/index.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node --watch src/index.js",
+    "backfill": "node scripts/backfill.js",
+    "test-parser": "node scripts/test-parser.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.8.1",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2"
+  }
+}
