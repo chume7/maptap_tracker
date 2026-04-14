@@ -1,19 +1,6 @@
-const config = require('./config');
+const BASE_URL = 'https://api.groupme.com/v3';
 
-const API_BASE = 'https://api.groupme.com/v3';
-
-async function groupmeFetch(path, options = {}) {
-  const url = new URL(`${API_BASE}${path}`);
-  url.searchParams.set('token', config.groupmeAccessToken);
-
-  const response = await fetch(url, {
-    ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(options.headers || {})
-    }
-  });
-
+async function handleResponse(response) {
   const text = await response.text();
   let json = null;
   try {
@@ -23,58 +10,37 @@ async function groupmeFetch(path, options = {}) {
   }
 
   if (!response.ok) {
-    throw new Error(`GroupMe API error ${response.status}: ${text}`);
+    const message = json?.meta?.errors?.join('; ') || json?.meta?.error || text || response.statusText;
+    throw new Error(`GroupMe API error ${response.status}: ${message}`);
   }
 
   return json;
 }
 
-async function postBotMessage(text) {
-  const response = await fetch(`${API_BASE}/bots/post`, {
+export async function fetchGroupMessages({ accessToken, groupId, beforeId, limit = 100 }) {
+  const params = new URLSearchParams({ token: accessToken, limit: String(limit) });
+  if (beforeId) params.set('before_id', beforeId);
+
+  const url = `${BASE_URL}/groups/${groupId}/messages?${params.toString()}`;
+  const response = await fetch(url, { method: 'GET' });
+
+  if (response.status === 304) {
+    return [];
+  }
+
+  const json = await handleResponse(response);
+  return json?.response?.messages || [];
+}
+
+export async function postBotMessage({ botId, text }) {
+  const response = await fetch(`${BASE_URL}/bots/post`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      bot_id: config.groupmeBotId,
-      text
-    })
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ bot_id: botId, text })
   });
 
-  const responseText = await response.text();
   if (!response.ok) {
-    throw new Error(`Failed to post bot message (${response.status}): ${responseText}`);
+    const body = await response.text();
+    throw new Error(`Failed to post bot message: ${response.status} ${body}`);
   }
-
-  return responseText;
 }
-
-async function fetchGroupMessagesPage({ beforeId = null, limit = 100 } = {}) {
-  const path = `/groups/${config.groupmeGroupId}/messages`;
-  const url = new URL(`${API_BASE}${path}`);
-  url.searchParams.set('token', config.groupmeAccessToken);
-  url.searchParams.set('limit', String(limit));
-  if (beforeId) url.searchParams.set('before_id', beforeId);
-
-  const response = await fetch(url, { method: 'GET' });
-  const text = await response.text();
-  let json = null;
-  try {
-    json = text ? JSON.parse(text) : null;
-  } catch {
-    json = null;
-  }
-
-  if (!response.ok) {
-    throw new Error(`Failed to fetch group messages (${response.status}): ${text}`);
-  }
-
-  const messages = json?.response?.messages || [];
-  return messages;
-}
-
-module.exports = {
-  postBotMessage,
-  fetchGroupMessagesPage,
-  groupmeFetch
-};

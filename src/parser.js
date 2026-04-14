@@ -1,48 +1,41 @@
-function normalizeLineEndings(text) {
-  return String(text || '').replace(/\r\n/g, '\n').trim();
+function normalizeText(text) {
+  return String(text || '')
+    .replace(/\r\n/g, '\n')
+    .trim();
 }
 
-function parseMapTapMessage(text) {
-  const normalized = normalizeLineEndings(text);
-  if (!normalized) return null;
+export function parseMapTapMessage(text) {
+  const cleaned = normalizeText(text);
+  if (!cleaned) return null;
 
-  const lines = normalized
+  const lines = cleaned
     .split('\n')
     .map((line) => line.trim())
     .filter(Boolean);
 
   if (lines.length < 3) return null;
 
-  const dateLine = lines[0];
-  const roundsLine = lines[1];
-  const finalLine = lines.find((line) => /^Final score\s*:/i.test(line));
+  const finalLineIndex = lines.findIndex((line) => /^Final score\s*:/i.test(line));
+  if (finalLineIndex === -1) return null;
 
-  if (!dateLine || !roundsLine || !finalLine) return null;
-
-  const roundMatches = [...roundsLine.matchAll(/(\d{1,3})/g)].map((match) => Number(match[1]));
-  if (roundMatches.length !== 5) return null;
-
-  const finalMatch = finalLine.match(/^Final score\s*:\s*(\d{1,5})\s*$/i);
+  const finalMatch = lines[finalLineIndex].match(/^Final score\s*:\s*(\d{1,5})\s*$/i);
   if (!finalMatch) return null;
-
-  const [round1, round2, round3, round4, round5] = roundMatches;
   const finalScore = Number(finalMatch[1]);
 
-  if ([round1, round2, round3, round4, round5, finalScore].some((n) => Number.isNaN(n))) {
-    return null;
-  }
+  const scoreLineIndex = finalLineIndex - 1;
+  if (scoreLineIndex < 0) return null;
+  const roundLine = lines[scoreLineIndex];
+  const roundScores = [...roundLine.matchAll(/(\d{1,3})/g)].map((m) => Number(m[1]));
+  if (roundScores.length !== 5) return null;
+
+  const dateLines = lines.slice(0, scoreLineIndex);
+  if (dateLines.length === 0) return null;
+  const gameDateText = dateLines.join(' ');
 
   return {
-    gameDateText: dateLine,
-    round1,
-    round2,
-    round3,
-    round4,
-    round5,
-    finalScore
+    gameDateText,
+    roundScores,
+    finalScore,
+    rawText: cleaned
   };
 }
-
-module.exports = {
-  parseMapTapMessage
-};

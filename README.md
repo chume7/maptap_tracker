@@ -1,19 +1,44 @@
-# MapTap GroupMe Bot
+# MapTap GroupMe Bot — Free GitHub Actions Version
 
-This project does four things:
+This version uses **GitHub Actions only**.
 
-1. receives new messages from one specific GroupMe chat
-2. detects MapTap score posts
-3. stores every valid score by user
-4. posts a daily all-time average leaderboard at noon
+That means:
+- no Render
+- no hosted server
+- no database
+- no callback URL
+- no monthly hosting bill
 
-It is designed to be as beginner-friendly as possible.
+Once per day, GitHub Actions will:
+1. read messages from your GroupMe chat
+2. look only at messages from **March 1, 2026 forward**
+3. find valid MapTap posts
+4. calculate each user’s all-time average `Final score`
+5. post the leaderboard back into the chat
 
 ---
 
-## What this bot expects
+## What the bot posts
 
-The bot looks for messages in this format:
+Example output:
+
+```text
+MapTap All-Time Average
+
+1. User 1: 842.3
+2. User 2: 817.0
+3. User 3: 799.4
+
+Updated: Apr 14, 2026, 12:00 PM
+
+I seriously hope nobody does the stats on our performances
+```
+
+---
+
+## What counts as a valid MapTap message
+
+A message must look like this:
 
 ```text
 April 14
@@ -21,107 +46,42 @@ April 14
 Final score: 826
 ```
 
-The bot extracts:
+The script extracts:
+- the date line
+- the five round scores
+- the final score
 
-- the date text (`April 14`)
-- the five round scores (`94`, `93`, `90`, `93`, `60`)
-- the final score (`826`)
-- the sender from GroupMe
-
-Then it stores the result and uses the `Final score` to compute each user's all-time average.
+It uses the **Final score** for the leaderboard.
 
 ---
 
-## What you need before you start
+# Part 1 — What you need before you start
 
-You need these accounts or tools:
+You need 4 things:
 
-- a **GroupMe account**
-- access to the **specific GroupMe group chat**
-- a **GitHub account**
-- a **Render account**
-- **Node.js 20 or newer** installed on your computer
-- **Git** installed on your computer
-
-If you do not already have Node.js:
-
-1. go to the official Node.js website
-2. install the **LTS** version
-3. after install, open Terminal and run:
-
-```bash
-node -v
-npm -v
-```
-
-You should see version numbers.
+1. a GitHub account
+2. a GroupMe account
+3. the target GroupMe chat already created
+4. a GroupMe bot created inside that chat
 
 ---
 
-## How the system works
+# Part 2 — Get the 3 GroupMe values you need
 
-There are 3 moving parts:
+You need these exact values:
 
-### Part 1: the web app
+- `GROUPME_ACCESS_TOKEN`
+- `GROUPME_GROUP_ID`
+- `GROUPME_BOT_ID`
 
-This app runs on Render and exposes a public URL.
+## Step 2.1 — Get your GroupMe access token
 
-It has these routes:
+1. Go to the GroupMe developer site.
+2. Sign in.
+3. Create or view your access token.
+4. Copy it somewhere safe.
 
-- `POST /groupme/callback` → receives new GroupMe messages
-- `GET /health` → lets you confirm the app is alive
-- `POST /jobs/daily-post` → posts the daily leaderboard
-- `POST /jobs/backfill` → optional protected route to backfill old messages
-
-### Part 2: the database
-
-The app stores valid MapTap submissions in SQLite.
-
-### Part 3: the daily scheduler
-
-A GitHub Actions workflow triggers the app once per day at noon Eastern Time and tells it to post the leaderboard.
-
-That means:
-
-- Render keeps the app online for GroupMe callbacks
-- GitHub Actions handles the schedule
-
-This combination is simple and avoids extra cron setup on your server. GitHub Actions supports scheduled workflows with cron syntax, and scheduled times are based on UTC unless you explicitly handle timezone conversion. citeturn352556search2turn352556search8
-
----
-
-## Fastest setup path
-
-Follow these steps in order.
-
-1. create the GroupMe bot
-2. download this project and put it in GitHub
-3. deploy it to Render
-4. add your secrets in Render
-5. set your GroupMe bot callback URL
-6. run the backfill once
-7. add GitHub Actions secrets
-8. let the daily post run automatically
-
----
-
-## Step 1: create your GroupMe access token
-
-GroupMe uses OAuth to create an access token for your app account. citeturn352556search3
-
-You need:
-
-- your **GroupMe access token**
-- your **GroupMe group ID**
-- your **GroupMe bot ID**
-
-### 1A. Get your GroupMe access token
-
-Use the GroupMe developer site.
-
-Once you have the token, copy it somewhere safe. You will paste it into Render and GitHub later.
-
-Save it as:
+You will later save it in GitHub Secrets as:
 
 ```text
 GROUPME_ACCESS_TOKEN
@@ -129,18 +89,18 @@ GROUPME_ACCESS_TOKEN
 
 ---
 
-## Step 2: find your GroupMe group ID
+## Step 2.2 — Find your Group ID
 
-You need the ID of the exact group chat that contains the MapTap messages.
+### Easiest method
 
-A simple way to get it:
+1. Open GroupMe in your browser.
+2. Open the chat you want the bot to use.
+3. Look at the URL.
+4. The number in the URL for that group is often the group ID.
 
-1. use the GroupMe developer tools or API explorer
-2. list your groups
-3. find the correct group name
-4. copy its `group_id`
+If you are not sure, use the GroupMe API to list your groups.
 
-Save it as:
+Save that value as:
 
 ```text
 GROUPME_GROUP_ID
@@ -148,421 +108,320 @@ GROUPME_GROUP_ID
 
 ---
 
-## Step 3: create the bot in that GroupMe group
+## Step 2.3 — Create the bot and copy the bot ID
 
-GroupMe bots can be created in a specific group and can be given a `callback_url`. GroupMe will send an HTTP `POST` to that callback URL every time a new message is posted in the group. Bots also post back to the group using their `bot_id`. citeturn352556search0turn352556search6
+1. In the GroupMe developer portal, create a bot.
+2. Choose the correct group.
+3. Give the bot a name.
+4. Give it an avatar if you want.
+5. You do **not** need a callback URL for this version.
+6. Save the bot.
+7. Copy the bot ID.
 
-When you create the bot, save the returned:
+Save that value as:
 
 ```text
 GROUPME_BOT_ID
 ```
 
-You can leave the callback URL blank at first if you have not deployed the app yet.
+---
 
-Later, after deployment, you will set:
+# Part 3 — Put this project in GitHub
+
+## Step 3.1 — Create a GitHub repository
+
+1. Go to GitHub.
+2. Click **New repository**.
+3. Name it something like:
 
 ```text
-https://YOUR-APP-URL/groupme/callback
+maptap-tracker
 ```
+
+4. Choose **Private** if you want.
+5. Create the repo.
 
 ---
 
-## Step 4: put this project on your computer
+## Step 3.2 — Upload these files
 
-### 4A. Unzip the project
+### Option A — easiest if you are using local files
 
-Unzip the folder somewhere easy to find.
+If you downloaded this starter project and unzipped it locally:
 
-Example:
-
-```text
-Desktop/maptap-groupme-bot
-```
-
-### 4B. Open Terminal in the project folder
-
-Example:
-
-```bash
-cd ~/Desktop/maptap-groupme-bot
-```
-
-### 4C. Install dependencies
-
-```bash
-npm install
-```
-
----
-
-## Step 5: test the parser locally
-
-This is optional but recommended.
-
-Run:
-
-```bash
-npm run test-parser
-```
-
-You should see the sample message parsed successfully.
-
----
-
-## Step 6: create your local env file
-
-Copy the example env file:
-
-```bash
-cp .env.example .env
-```
-
-Open `.env` and fill in:
-
-- `GROUPME_ACCESS_TOKEN`
-- `GROUPME_BOT_ID`
-- `GROUPME_GROUP_ID`
-- `APP_BASE_URL` (leave blank for now if local)
-- `DAILY_JOB_SECRET` (pick a long random string)
-
-For local testing, this is fine:
-
-```text
-PORT=3000
-DATABASE_PATH=./data/maptap.sqlite
-TIMEZONE=America/New_York
-DAILY_POST_HOUR_LOCAL=12
-```
-
----
-
-## Step 7: run the app locally
-
-Start the server:
-
-```bash
-npm start
-```
-
-You should see output similar to:
-
-```text
-MapTap bot listening on port 3000
-```
-
-Then visit:
-
-```text
-http://localhost:3000/health
-```
-
-You should see JSON showing the app is healthy.
-
----
-
-## Step 8: push this project to GitHub
-
-If you are new to GitHub, do exactly this.
-
-### 8A. Create a new GitHub repository
-
-Give it a name like:
-
-```text
-maptap-groupme-bot
-```
-
-### 8B. In Terminal, from your project folder, run:
+1. Open Terminal.
+2. Go into the project folder.
+3. Run:
 
 ```bash
 git init
 git add .
-git commit -m "Initial MapTap GroupMe bot"
-```
-
-### 8C. Connect it to GitHub
-
-Replace `YOUR_GITHUB_REPO_URL` with the URL GitHub gives you:
-
-```bash
-git remote add origin YOUR_GITHUB_REPO_URL
+git commit -m "Initial commit"
 git branch -M main
+git remote add origin https://github.com/YOUR_GITHUB_USERNAME/YOUR_REPO_NAME.git
 git push -u origin main
 ```
 
----
+If you already connected a remote before, do not run `git remote add origin` again.
 
-## Step 9: deploy to Render
-
-Render supports a `render.yaml` Blueprint file that defines your app in your repository. citeturn352556search1turn352556search4turn352556search19
-
-This project already includes `render.yaml`, so deployment is easier.
-
-### 9A. In Render
-
-1. log in
-2. choose **New**
-3. choose **Blueprint**
-4. connect your GitHub repository
-5. select this repository
-6. let Render read `render.yaml`
-
-### 9B. Fill in the required secrets in Render
-
-Render will ask for these env vars:
-
-- `APP_BASE_URL`
-- `GROUPME_ACCESS_TOKEN`
-- `GROUPME_BOT_ID`
-- `GROUPME_GROUP_ID`
-- `DAILY_JOB_SECRET`
-
-Set `APP_BASE_URL` to your final public app URL.
-
-Example:
-
-```text
-https://maptap-groupme-bot.onrender.com
-```
-
-### 9C. Finish deployment
-
-When deployment finishes, open:
-
-```text
-https://YOUR-APP-URL/health
-```
-
-You should see a healthy response.
-
----
-
-## Step 10: set the GroupMe callback URL
-
-Now that your app is live, update the bot's callback URL to:
-
-```text
-https://YOUR-APP-URL/groupme/callback
-```
-
-GroupMe bots with a callback URL will POST every new group message to that URL. citeturn352556search0turn352556search6
-
-At this point, all **new** MapTap messages in that group will be stored automatically.
-
----
-
-## Step 11: import old messages with backfill
-
-This is how you load all historical MapTap posts.
-
-You have two ways to do it.
-
-### Option A: easiest way — run from your own computer
-
-From your project folder, run:
+If Git says the remote already has files, pull first:
 
 ```bash
-npm run backfill
+git pull origin main --no-rebase --allow-unrelated-histories
 ```
 
-This script calls the GroupMe messages API, pages backward through the group history, parses every valid MapTap message, and stores the results in your database.
-
-GroupMe's messages endpoint supports reading group messages and paging older messages using `before_id`. citeturn352556search6
-
-### Option B: run on the server
-
-You can also call the protected backfill route.
-
-Example using curl:
-
-```bash
-curl -X POST https://YOUR-APP-URL/jobs/backfill \
-  -H "x-job-secret: YOUR_DAILY_JOB_SECRET"
-```
-
-I recommend **Option A** first because it is easier to watch and debug.
+Then fix any merge conflicts, commit, and push again.
 
 ---
 
-## Step 12: test a manual leaderboard post
+# Part 4 — Add your secrets in GitHub
 
-Before automating the daily post, test it once.
+This is the most important part.
 
-Run this from Terminal:
-
-```bash
-curl -X POST https://YOUR-APP-URL/jobs/daily-post \
-  -H "x-job-secret: YOUR_DAILY_JOB_SECRET"
-```
-
-The bot should post the leaderboard into the GroupMe chat.
-
-If it does, the core system is working.
-
----
-
-## Step 13: automate the daily noon post with GitHub Actions
-
-This repo already includes:
-
-```text
-.github/workflows/daily-post.yml
-```
-
-GitHub Actions supports scheduled workflows using cron syntax. Scheduled runs are based on UTC, so this workflow is set up to run at **both 16:00 UTC and 17:00 UTC every day**. The app itself checks New York local time and only posts when the local hour is exactly noon, which keeps the noon post working across daylight saving changes without any manual edits. citeturn352556search2turn352556search8
-
-### 13A. Add GitHub Actions secrets
+## Step 4.1 — Open repository secrets
 
 In your GitHub repo:
 
-1. go to **Settings**
-2. go to **Secrets and variables**
-3. go to **Actions**
-4. add these secrets:
+1. Click **Settings**
+2. Click **Secrets and variables**
+3. Click **Actions**
+4. Click **New repository secret**
 
-- `APP_BASE_URL`
-- `DAILY_JOB_SECRET`
+Create these 4 secrets:
 
-Example values:
-
-- `APP_BASE_URL` = `https://maptap-groupme-bot.onrender.com`
-- `DAILY_JOB_SECRET` = your long secret string
-
-### 13B. Confirm the workflow exists
-
-The file is already included. Once pushed to `main`, GitHub will show it under **Actions**.
-
-### 13C. Optional: run it manually once
-
-The workflow supports manual runs from GitHub Actions.
-
----
-
-## Important time note
-
-You do **not** need to manually change the schedule for daylight saving time.
-
-The included GitHub workflow runs twice daily, once at `16:00 UTC` and once at `17:00 UTC`. The server checks the configured timezone (`America/New_York`) and only posts when the local hour is `12`.
-
-That means:
-
-- one run will be ignored
-- the noon-local run will post
-- only one post can happen per day because the app records that it already posted
-
----
-
-## Common commands
-
-### Start locally
-
-```bash
-npm start
-```
-
-### Run backfill
-
-```bash
-npm run backfill
-```
-
-### Test parser
-
-```bash
-npm run test-parser
-```
-
----
-
-## Troubleshooting
-
-### The bot is not posting
-
-Check:
-
-- `GROUPME_BOT_ID` is correct
-- the bot belongs to the correct group
-- the app is live at `/health`
-- the daily job secret matches in both Render and GitHub
-
-### New messages are not being saved
-
-Check:
-
-- callback URL is exactly `https://YOUR-APP-URL/groupme/callback`
-- the message really matches the expected format
-- the group ID in env matches the actual group
-
-### Backfill says it is working but nothing is stored
-
-Check:
-
-- your GroupMe access token is correct
-- the group ID is correct
-- the target group really contains MapTap messages in the expected text format
-
-### Duplicate counting
-
-This app prevents duplicate inserts by GroupMe message ID.
-
----
-
-## Behavior choices already built in
-
-This starter project does the following by default:
-
-- counts **all valid submissions** for each user
-- computes averages using `Final score`
-- tracks users by stable GroupMe `user_id`
-- displays the latest known display name
-- ignores bot messages
-- ignores invalid message formats
-- prevents duplicate inserts by message ID
-- only posts once per local day, even if the daily endpoint is hit more than once
-
----
-
-## Files included
+### Secret 1
+Name:
 
 ```text
-src/index.js              main server
-src/config.js             environment loading and validation
-src/db.js                 SQLite database setup and queries
-src/parser.js             MapTap message parser
-src/groupme.js            GroupMe API helpers
-scripts/backfill.js       historical import script
-scripts/test-parser.js    parser smoke test
-.github/workflows/daily-post.yml
-render.yaml
-.env.example
+GROUPME_ACCESS_TOKEN
+```
+
+Value:
+Your GroupMe access token
+
+### Secret 2
+Name:
+
+```text
+GROUPME_GROUP_ID
+```
+
+Value:
+Your GroupMe group ID
+
+### Secret 3
+Name:
+
+```text
+GROUPME_BOT_ID
+```
+
+Value:
+Your GroupMe bot ID
+
+### Secret 4
+Name:
+
+```text
+MAPTAP_START_DATE
+```
+
+Value:
+
+```text
+2026-03-01
 ```
 
 ---
 
-## Next improvements you might want later
+# Part 5 — Run it manually once to test
 
-Once this is working, common upgrades are:
+## Step 5.1 — Open GitHub Actions
 
-- add a second leaderboard for average by round 1–5
-- add a minimum-games threshold before showing a user
-- add `best score ever` per user
-- post a weekly instead of daily summary too
-- add an endpoint that shows raw submission history per user
+1. Open your repository
+2. Click **Actions**
+3. Click **Daily MapTap leaderboard**
+4. Click **Run workflow**
+5. Click the green run button
+
+This will run the script immediately.
 
 ---
 
-## Final setup checklist
+## Step 5.2 — Confirm the bot posted in GroupMe
 
-Before you consider setup complete, confirm all of these:
+Go to the GroupMe chat and check for the leaderboard message.
 
-- [ ] Render app is deployed
-- [ ] `/health` works
-- [ ] GroupMe callback URL is set
-- [ ] one new MapTap message gets stored
-- [ ] backfill completes
-- [ ] manual daily post works
-- [ ] GitHub Actions secrets are set
-- [ ] scheduled noon post works
+If you do not see a message:
+- open the GitHub Actions run
+- click the job
+- expand the failed step
+- read the error message
 
-If you work through the checklist in order, you will have a live bot with historical stats and automatic daily leaderboard posts.
+---
+
+# Part 6 — Automatic daily posting
+
+This project already includes the workflow file.
+
+File:
+
+```text
+.github/workflows/daily-post.yml
+```
+
+GitHub Actions will run it automatically every day.
+
+Important note:
+- GitHub cron uses **UTC**
+- this workflow runs at both **16:00 UTC** and **17:00 UTC** to cover daylight saving time changes
+
+The script includes a safety check and only posts when the local time in New York is actually 12 PM, so the extra cron entry is just there to safely cover daylight saving time.
+
+---
+
+# Part 7 — Test locally before pushing (optional)
+
+If you want to test on your own computer:
+
+## Step 7.1 — Install Node.js
+
+Install Node.js 20 or newer.
+
+## Step 7.2 — Create your local env file
+
+Copy `.env.example` to `.env`.
+
+Then fill in the values.
+
+## Step 7.3 — Run the parser test
+
+```bash
+npm install
+npm run test:sample
+```
+
+You should see parsed output for the sample message.
+
+## Step 7.4 — Dry run the full script
+
+In Terminal:
+
+```bash
+export $(cat .env | xargs)
+node src/index.js
+```
+
+Because `.env.example` sets `DRY_RUN=true`, it will show the message preview without posting.
+
+When you are ready to post for real, change:
+
+```text
+DRY_RUN=false
+```
+
+---
+
+# Part 8 — How the files are organized
+
+## Main code
+
+- `src/index.js` — main script
+- `src/parser.js` — reads MapTap messages
+- `src/groupme.js` — talks to the GroupMe API
+- `src/config.js` — loads settings
+- `src/format.js` — formats the leaderboard post
+- `src/date-utils.js` — date helpers
+
+## GitHub Actions
+
+- `.github/workflows/daily-post.yml` — daily scheduler
+
+## Testing
+
+- `scripts/test-sample.js` — sample parser test
+
+---
+
+# Part 9 — What this bot does not do
+
+This version is intentionally simple.
+
+It does **not**:
+- react instantly to new messages
+- store a database
+- use a callback URL
+- keep an external cache
+
+Instead, every day it re-reads the group history from March 1, 2026 onward and recomputes the averages fresh.
+
+That is why this version stays free and simple.
+
+---
+
+# Part 10 — Troubleshooting
+
+## Problem: Git says push rejected
+
+Run:
+
+```bash
+git pull origin main --no-rebase --allow-unrelated-histories
+```
+
+Then resolve any conflicts, commit, and push again.
+
+---
+
+## Problem: GitHub Action fails because a secret is missing
+
+Check that all 4 secrets exist exactly with these names:
+
+- `GROUPME_ACCESS_TOKEN`
+- `GROUPME_GROUP_ID`
+- `GROUPME_BOT_ID`
+- `MAPTAP_START_DATE`
+
+---
+
+## Problem: Bot does not post anything
+
+Possible causes:
+- the bot ID is wrong
+- the group ID is wrong
+- the access token is wrong
+- there are no valid MapTap messages since `2026-03-01`
+- the bot was created in a different GroupMe chat
+
+---
+
+## Problem: Messages are not being picked up
+
+The parser expects:
+- a date line
+- one line with 5 numeric round scores
+- a line that starts with `Final score:`
+
+If your group uses a slightly different format, the parser can be adjusted easily.
+
+---
+
+# Part 11 — Official references
+
+GroupMe’s official API docs say group messages can be retrieved from `GET /groups/:group_id/messages`, paged backward with `before_id`, and bots can post into a group with `POST /bots/post`. citeturn981729search0
+
+GitHub’s official docs say scheduled workflows are supported in GitHub Actions, and private repositories on GitHub Free get included Actions minutes each month. citeturn981729search1turn981729search3
+
+---
+
+# Part 12 — Fastest path
+
+If you just want the shortest version:
+
+1. create the GroupMe bot
+2. copy the token, group ID, and bot ID
+3. upload this project to GitHub
+4. add the 4 GitHub secrets
+5. run the workflow manually once
+6. confirm the post appears in GroupMe
+7. let GitHub Actions handle the daily noon post
