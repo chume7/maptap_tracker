@@ -32,4 +32,5 @@ jobs:
           TIMEZONE: America/New_York
           POST_TITLE: MapTap All-Time Average
           POST_FOOTER: I seriously hope nobody does the stats on our performances
+          FORCE_POST: true
         run: node src/index.js

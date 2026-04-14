@@ -81,9 +81,14 @@ async function main() {
 
 
   const localHour = getLocalHour(config.timezone);
-  if (localHour !== 12) {
+
+  if (localHour !== 12 && process.env.FORCE_POST !== "true") {
     console.log(`Skipping post because local hour in ${config.timezone} is ${localHour}, not 12.`);
     return;
+  }
+
+  if (process.env.FORCE_POST === "true") {
+    console.log("FORCE_POST enabled — bypassing time check");
   }
 
   console.log(`Fetching GroupMe messages from ${config.startDate} onward...`);
