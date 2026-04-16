@@ -4,8 +4,8 @@ on:
   schedule:
     # 16:00 UTC = 12:00 PM America/New_York during EDT.
     # 17:00 UTC = 12:00 PM America/New_York during EST.
-    - cron: '0 16 * * *'
-    - cron: '0 17 * * *'
+    - cron: '0 20 * * *'
+    #- cron: '0 17 * * *'
   workflow_dispatch:
 
 jobs:
